@@ -1,0 +1,1643 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Hogwarts Trivia — The Wizarding Challenge</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700;900&family=EB+Garamond:ital@0;1&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --gold: #d3a625;
+    --gold-light: #f0c75e;
+    --parchment: #f4ecd8;
+    --ink: #2b2113;
+    --night: #0b1026;
+    --night-2: #161a3a;
+    --correct: #2e7d4f;
+    --wrong: #9b2226;
+    --map-ink: #5a4326;
+
+    /* House palette (set dynamically) */
+    --house-primary: #740001;
+    --house-secondary: #d3a625;
+    --house-accent: #eeba30;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html, body { height: 100%; }
+
+  body {
+    font-family: 'EB Garamond', Georgia, serif;
+    color: var(--parchment);
+    background-color: #c9ad77;
+    background-image:
+      radial-gradient(ellipse at 50% 38%, rgba(247,238,210,0.55), transparent 62%),
+      radial-gradient(circle at 12% 18%, rgba(108,80,38,0.22), transparent 32%),
+      radial-gradient(circle at 88% 84%, rgba(108,80,38,0.24), transparent 36%),
+      radial-gradient(circle at 80% 12%, rgba(108,80,38,0.16), transparent 28%),
+      linear-gradient(160deg, #dcc491 0%, #c4a468 60%, #ad8c52 100%);
+    background-attachment: fixed;
+    min-height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    overflow-x: hidden;
+  }
+
+  /* ===== The Marauder's Map background ===== */
+  .map-bg { position: fixed; inset: 0; z-index: 0; pointer-events: none; }
+  .map-bg svg { width: 100%; height: 100%; display: block; }
+  /* edge vignette so the parchment looks aged and the cards stand out */
+  .map-bg::after {
+    content: ""; position: fixed; inset: 0; pointer-events: none;
+    background: radial-gradient(ellipse at center, transparent 38%, rgba(74,52,20,0.42) 100%);
+  }
+
+  .m-frame { fill: none; stroke: var(--map-ink); stroke-width: 3; opacity: 0.55; }
+  .m-frame.thin { stroke-width: 1.4; opacity: 0.4; }
+  .m-line { fill: none; stroke: var(--map-ink); stroke-width: 1.6; opacity: 0.6; }
+  .m-ink-fill { fill: var(--map-ink); opacity: 0.55; }
+  .m-ink-soft { fill: var(--map-ink); opacity: 0.3; }
+
+  .m-room { fill: rgba(90,67,38,0.05); stroke: var(--map-ink); stroke-width: 2.2; opacity: 0.6; }
+  .m-room.thin { fill: none; stroke-width: 1.2; opacity: 0.45; }
+  .m-corridor {
+    stroke: var(--map-ink); stroke-width: 2; opacity: 0.4;
+    stroke-dasharray: 2 7; stroke-linecap: round;
+  }
+
+  .m-title {
+    font-family: 'Cinzel', serif; font-weight: 900; font-size: 38px;
+    text-anchor: middle; fill: var(--map-ink); opacity: 0.62; letter-spacing: 3px;
+  }
+  .m-makers {
+    font-family: 'EB Garamond', serif; font-style: italic; font-size: 16px;
+    text-anchor: middle; fill: var(--map-ink); opacity: 0.5; letter-spacing: 1px;
+  }
+  .m-label {
+    font-family: 'Cinzel', serif; font-weight: 700; font-size: 15px;
+    text-anchor: middle; fill: var(--map-ink); opacity: 0.62; letter-spacing: 0.5px;
+  }
+  .m-compass-n { font-family: 'Cinzel', serif; font-size: 13px; text-anchor: middle; fill: var(--map-ink); opacity: 0.6; }
+  .m-hatch { stroke: var(--map-ink); stroke-width: 0.8; opacity: 0.3; }
+  .m-secret { fill: none; stroke: var(--map-ink); stroke-width: 1.6; opacity: 0.45; stroke-dasharray: 1 6; stroke-linecap: round; }
+  .m-wall { stroke: var(--map-ink); stroke-width: 1.4; opacity: 0.5; fill: none; }
+
+  /* moving staircases */
+  .m-stair { transform-box: fill-box; transform-origin: 50% 50%; animation: sway 8s ease-in-out infinite alternate; }
+  @keyframes sway { from { transform: rotate(-6deg); } to { transform: rotate(6deg); } }
+
+  /* characters & their fading footprint trails */
+  .m-name {
+    font-family: 'EB Garamond', serif; font-style: italic; font-size: 14px;
+    text-anchor: middle; fill: #3f2d12;
+    stroke: rgba(238,226,191,0.85); stroke-width: 3px; paint-order: stroke fill;
+    letter-spacing: 0.3px;
+  }
+  .foot { fill: var(--map-ink); animation: footFade var(--life, 3.5s) linear forwards; }
+  @keyframes footFade { 0% { opacity: 0.78; } 70% { opacity: 0.5; } 100% { opacity: 0; } }
+  .foot.static { animation: none; opacity: 0.5; }
+
+  /* gentle cursor parallax for depth */
+  .map-bg svg { transform: scale(1.06); transition: transform .35s ease-out; will-change: transform; }
+
+  /* House-colored glow once the challenge begins */
+  body.quiz-active::before {
+    content: ""; position: fixed; inset: 0; z-index: 0; pointer-events: none;
+    background: radial-gradient(circle at 50% 22%, var(--house-primary), transparent 60%);
+    opacity: 0.22; transition: opacity .6s; mix-blend-mode: multiply;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .m-stair { animation: none; }
+    .map-bg svg { transition: none; }
+  }
+
+  .stage {
+    position: relative; z-index: 1;
+    width: 100%; max-width: 960px;
+  }
+  /* Start screen is wide & short; quiz/results stay a comfortable reading width */
+  #start-screen { max-width: 960px; margin: 0 auto; }
+  #quiz-screen, #result-screen { max-width: 640px; margin: 0 auto; }
+
+  .card {
+    background:
+      linear-gradient(145deg, rgba(244,236,216,0.97), rgba(232,220,193,0.97));
+    color: var(--ink);
+    border: 2px solid var(--gold);
+    border-radius: 18px;
+    padding: 40px 38px;
+    position: relative;
+    overflow: hidden;
+    box-shadow:
+      0 0 0 1px rgba(0,0,0,0.25),
+      0 18px 50px rgba(0,0,0,0.55),
+      inset 0 0 40px rgba(180,140,40,0.12);
+    animation: rise .5s ease both;
+  }
+  @keyframes rise { from{opacity:0; transform:translateY(18px);} to{opacity:1; transform:translateY(0);} }
+
+  .crest {
+    text-align: center;
+    font-size: 52px;
+    line-height: 1;
+    margin-bottom: 6px;
+    filter: drop-shadow(0 2px 6px rgba(0,0,0,.3));
+  }
+
+  h1 {
+    font-family: 'Cinzel', serif;
+    font-weight: 900;
+    text-align: center;
+    font-size: clamp(26px, 5vw, 38px);
+    letter-spacing: 1px;
+    color: #5a3e0b;
+    margin-bottom: 4px;
+  }
+  .subtitle {
+    text-align: center;
+    font-style: italic;
+    color: #6b5530;
+    margin-bottom: 28px;
+    font-size: 18px;
+  }
+
+  label.field-label {
+    display: block;
+    font-family: 'Cinzel', serif;
+    font-weight: 700;
+    font-size: 14px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: #5a3e0b;
+    margin-bottom: 10px;
+  }
+
+  input[type="text"] {
+    width: 100%;
+    font-family: 'EB Garamond', serif;
+    font-size: 20px;
+    padding: 14px 16px;
+    border: 2px solid #b89b54;
+    border-radius: 10px;
+    background: rgba(255,255,255,0.6);
+    color: var(--ink);
+    outline: none;
+    transition: border-color .2s, box-shadow .2s;
+    margin-bottom: 26px;
+  }
+  input[type="text"]:focus {
+    border-color: var(--gold);
+    box-shadow: 0 0 0 4px rgba(211,166,37,0.25);
+  }
+
+  .houses {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 14px;
+    margin-bottom: 30px;
+  }
+  .house {
+    cursor: pointer;
+    border-radius: 14px;
+    padding: 22px 16px 18px;
+    text-align: center;
+    color: #fff;
+    position: relative;
+    overflow: hidden;
+    isolation: isolate;
+    transition: transform .18s ease, box-shadow .25s ease, filter .25s ease;
+    user-select: none;
+    box-shadow:
+      0 8px 22px rgba(0,0,0,0.4),
+      inset 0 1px 0 rgba(255,255,255,0.18),
+      inset 0 -20px 40px rgba(0,0,0,0.28);
+  }
+  /* spotlight behind the crest + faint woven texture */
+  .house::before {
+    content: "";
+    position: absolute; inset: 0; z-index: -1;
+    background:
+      radial-gradient(ellipse 70% 45% at 50% 30%, rgba(255,255,255,0.22), transparent 60%),
+      repeating-linear-gradient(45deg, rgba(255,255,255,0.035) 0 7px, transparent 7px 14px);
+    pointer-events: none;
+  }
+  /* ornate inset gold frame */
+  .house::after {
+    content: "";
+    position: absolute; inset: 9px; z-index: -1;
+    border: 1.5px solid rgba(240,199,94,0.45);
+    border-radius: 9px;
+    box-shadow: inset 0 0 14px rgba(0,0,0,0.25);
+    pointer-events: none;
+    transition: border-color .25s, box-shadow .25s;
+  }
+  .house:hover {
+    transform: translateY(-4px) scale(1.015);
+    filter: brightness(1.07) saturate(1.05);
+    box-shadow: 0 14px 32px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.22);
+  }
+  .house:hover::after { border-color: rgba(240,199,94,0.85); }
+
+  .house .emoji { display: block; margin-bottom: 10px; line-height: 0; }
+  .house .emoji svg, .house .emoji img { width: 70px; height: 76px; object-fit: contain; filter: drop-shadow(0 4px 7px rgba(0,0,0,0.55)); transition: transform .2s ease; }
+  .house:hover .emoji img, .house:hover .emoji svg { transform: scale(1.06) translateY(-1px); }
+  .badge svg, .badge img { width: 16px; height: 20px; object-fit: contain; vertical-align: middle; }
+  .crest svg { width: 88px; height: auto; filter: drop-shadow(0 4px 8px rgba(0,0,0,0.3)); }
+  .house .name {
+    font-family:'Cinzel',serif; font-weight:700; letter-spacing:1.5px; font-size: 18px;
+    text-shadow: 0 1px 2px rgba(0,0,0,0.4);
+  }
+  /* decorative flourish under the house name */
+  .house .name::after {
+    content: "⚜";
+    display: block;
+    font-size: 11px;
+    color: currentColor;
+    opacity: 0.55;
+    margin: 5px 0 3px;
+  }
+  .house .traits { font-size: 13px; opacity: .92; font-style: italic; letter-spacing: .3px; }
+
+  .house.gryffindor { background: linear-gradient(155deg,#9b1113 0%,#740001 55%,#4e0001 100%); }
+  .house.slytherin  { background: linear-gradient(155deg,#2a623d 0%,#1a472a 55%,#0d2d1a 100%); }
+  .house.ravenclaw  { background: linear-gradient(155deg,#283a72 0%,#0e1a40 55%,#070f28 100%); }
+  .house.hufflepuff { background: linear-gradient(155deg,#f0c64a 0%,#cf9b25 55%,#9a6e16 100%); color:#2b2113; }
+  .house.hufflepuff::after { border-color: rgba(60,46,24,0.5); }
+  .house.hufflepuff .name { text-shadow: 0 1px 1px rgba(255,255,255,0.25); }
+
+  .house.selected {
+    transform: translateY(-4px) scale(1.025);
+    box-shadow:
+      0 0 0 3px var(--gold-light),
+      0 0 22px rgba(240,199,94,0.55),
+      0 12px 28px rgba(0,0,0,0.5);
+  }
+  .house.selected::after { border-color: var(--gold-light); box-shadow: inset 0 0 18px rgba(240,199,94,0.35); }
+  .house.selected .check {
+    position: absolute; top: 9px; right: 11px; z-index: 1;
+    width: 22px; height: 22px; border-radius: 50%;
+    display: grid; place-items: center;
+    background: var(--gold-light); color: #1c1405;
+    font-weight: 900; font-size: 13px;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.4);
+  }
+  .house .check { display: none; }
+  .house.selected .check { display: grid; }
+
+  .btn {
+    display: block;
+    width: 100%;
+    font-family: 'Cinzel', serif;
+    font-weight: 700;
+    letter-spacing: 1px;
+    font-size: 18px;
+    padding: 15px;
+    border: none;
+    border-radius: 12px;
+    cursor: pointer;
+    color: #1c1405;
+    background: linear-gradient(180deg, var(--gold-light), var(--gold));
+    box-shadow: 0 6px 18px rgba(211,166,37,0.4);
+    transition: transform .12s, box-shadow .2s, opacity .2s;
+  }
+  .btn:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 10px 26px rgba(211,166,37,0.55); }
+  .btn:active:not(:disabled) { transform: translateY(0); }
+  .btn:disabled { opacity: .45; cursor: not-allowed; }
+
+  .err {
+    color: var(--wrong);
+    font-weight: 600;
+    text-align: center;
+    min-height: 22px;
+    margin-bottom: 8px;
+  }
+
+  /* ---- Quiz screen ---- */
+  .hud {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 20px;
+    gap: 12px;
+  }
+  .hud .who {
+    display: flex; align-items: center; gap: 10px;
+    font-family:'Cinzel',serif; font-weight:700; color:#5a3e0b;
+  }
+  .badge {
+    display: inline-flex; align-items:center; gap:6px;
+    background: var(--house-primary);
+    color:#fff;
+    padding: 5px 12px; border-radius: 999px;
+    font-size: 13px; letter-spacing:.5px;
+    border: 1px solid var(--house-accent);
+  }
+  .score-pill {
+    font-family:'Cinzel',serif; font-weight:700;
+    background:#5a3e0b; color: var(--gold-light);
+    padding: 7px 14px; border-radius: 999px; font-size: 15px;
+    white-space: nowrap;
+  }
+
+  .progress-wrap {
+    height: 10px; background: rgba(90,62,11,0.2);
+    border-radius: 999px; overflow:hidden; margin-bottom: 22px;
+  }
+  .progress-bar {
+    height: 100%; width: 0;
+    background: linear-gradient(90deg, var(--gold), var(--gold-light));
+    transition: width .4s ease;
+  }
+
+  .q-count {
+    font-family:'Cinzel',serif; font-size:13px; letter-spacing:1px;
+    text-transform:uppercase; color:#8a6d2f; margin-bottom: 8px;
+  }
+  .question {
+    font-size: 23px; font-weight:600; line-height:1.35;
+    color: var(--ink); margin-bottom: 24px; min-height: 64px;
+  }
+
+  .options { display: grid; gap: 12px; margin-bottom: 18px; }
+  .option {
+    display: flex; align-items: center; gap: 14px;
+    text-align: left;
+    font-family:'EB Garamond',serif;
+    font-size: 18px;
+    padding: 14px 16px;
+    border: 2px solid #b89b54;
+    border-radius: 10px;
+    background: rgba(255,255,255,0.55);
+    color: var(--ink);
+    cursor: pointer;
+    transition: transform .12s, border-color .2s, background .2s;
+    width: 100%;
+  }
+  .option:hover:not(:disabled) { transform: translateX(4px); border-color: var(--gold); background: rgba(255,255,255,0.85); }
+  .option:disabled { cursor: default; }
+  .option .letter {
+    flex: 0 0 34px;
+    width: 34px; height: 34px;
+    display:grid; place-items:center;
+    font-family:'Cinzel',serif; font-weight:700;
+    background:#5a3e0b; color: var(--gold-light);
+    border-radius: 8px; font-size: 16px;
+  }
+  .option.correct { border-color: var(--correct); background: rgba(46,125,79,0.18); }
+  .option.correct .letter { background: var(--correct); color:#fff; }
+  .option.wrong { border-color: var(--wrong); background: rgba(155,34,38,0.15); }
+  .option.wrong .letter { background: var(--wrong); color:#fff; }
+
+  .feedback {
+    min-height: 30px;
+    text-align: center;
+    font-size: 19px;
+    font-weight: 700;
+    margin-bottom: 16px;
+    opacity: 0;
+    transition: opacity .25s;
+  }
+  .feedback.show { opacity: 1; }
+  .feedback.good { color: var(--correct); }
+  .feedback.bad { color: var(--wrong); }
+  .feedback small { display:block; font-weight:400; font-style:italic; color:#6b5530; font-size:15px; margin-top:4px; }
+
+  /* ---- Results ---- */
+  .result-score {
+    text-align:center;
+    font-family:'Cinzel',serif; font-weight:900;
+    font-size: 64px;
+    color: var(--house-primary);
+    line-height:1;
+    margin: 6px 0 2px;
+  }
+  .result-out { text-align:center; color:#6b5530; font-size:18px; margin-bottom: 18px; }
+  .rank {
+    text-align:center; font-family:'Cinzel',serif; font-weight:700;
+    font-size: 22px; color:#5a3e0b; margin-bottom: 10px;
+  }
+  .rank-msg { text-align:center; font-style:italic; color:#6b5530; font-size:17px; margin-bottom: 26px; }
+
+  .hidden { display: none !important; }
+
+  .footer-note {
+    text-align:center; font-size:12px; color: #8a6d2f;
+    margin-top: 16px; font-style: italic;
+  }
+
+  /* ===== Difficulty selector ===== */
+  .difficulties {
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 26px;
+  }
+  .diff {
+    cursor: pointer; user-select: none; text-align: center;
+    padding: 14px 8px; border-radius: 12px;
+    border: 2px solid #b89b54;
+    background: rgba(255,255,255,0.45);
+    transition: transform .15s, border-color .2s, box-shadow .2s, background .2s;
+  }
+  .diff:hover { transform: translateY(-2px); border-color: var(--gold); }
+  .diff .d-name { display:block; font-family:'Cinzel',serif; font-weight:700; font-size:16px; color:#5a3e0b; }
+  .diff .d-sub  { display:block; font-style:italic; font-size:12px; color:#6b5530; margin:2px 0 4px; }
+  .diff .d-time { display:block; font-size:13px; font-weight:600; color:#8a6d2f; }
+  .diff.selected {
+    border-color: var(--gold-light);
+    background: linear-gradient(180deg, rgba(240,199,94,0.35), rgba(211,166,37,0.18));
+    box-shadow: 0 0 0 3px rgba(240,199,94,0.4), 0 6px 16px rgba(0,0,0,0.2);
+  }
+
+  /* ===== Sound toggle ===== */
+  .sound-toggle {
+    position: fixed; top: 14px; right: 14px; z-index: 5;
+    width: 44px; height: 44px; border-radius: 50%;
+    border: 2px solid var(--gold);
+    background: rgba(20,14,5,0.78); color: var(--gold-light);
+    font-size: 20px; cursor: pointer; line-height: 1;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+    transition: transform .15s, background .2s;
+  }
+  .sound-toggle:hover { transform: scale(1.08); }
+  .sound-toggle.muted { opacity: 0.85; filter: grayscale(0.6); }
+
+  /* ===== HUD extras ===== */
+  .hud-right { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+  .diff-pill {
+    font-family:'Cinzel',serif; font-weight:700; font-size:13px;
+    background:#5a3e0b; color: var(--gold-light);
+    padding: 7px 12px; border-radius: 999px; white-space: nowrap;
+    border: 1px solid var(--gold);
+  }
+
+  /* ===== Per-question timer (hourglass) ===== */
+  .timer-row { display:flex; align-items:center; gap:10px; margin-bottom: 18px; }
+  .hourglass { font-size: 18px; line-height: 1; }
+  .timer-wrap {
+    flex: 1; height: 12px; border-radius: 999px; overflow: hidden;
+    background: rgba(90,62,11,0.18); border: 1px solid rgba(90,62,11,0.25);
+  }
+  .timer-bar {
+    height: 100%; width: 100%;
+    background: linear-gradient(90deg, #2e7d4f, #6fbf73);
+    border-radius: 999px;
+  }
+  .timer-bar.warning { background: linear-gradient(90deg, #c1121f, #f08c00); }
+  .timer-num {
+    font-family:'Cinzel',serif; font-weight:700; font-size:15px; color:#5a3e0b;
+    min-width: 28px; text-align:center;
+  }
+  .timer-num.warning { color: var(--wrong); animation: pulseNum .6s ease-in-out infinite; }
+  @keyframes pulseNum { 0%,100%{ transform: scale(1);} 50%{ transform: scale(1.25);} }
+
+  /* ===== Answer animations ===== */
+  @keyframes shake {
+    0%,100% { transform: translateX(0); }
+    15% { transform: translateX(-9px); } 30% { transform: translateX(8px); }
+    45% { transform: translateX(-7px); } 60% { transform: translateX(6px); }
+    75% { transform: translateX(-4px); } 90% { transform: translateX(2px); }
+  }
+  .option.wrong { animation: shake .5s ease; }
+  @keyframes correctPop {
+    0% { transform: scale(1); } 40% { transform: scale(1.05); } 100% { transform: scale(1); }
+  }
+  .option.correct { animation: correctPop .45s ease; }
+
+  /* full-card flashes (overlay element so it never clashes with the card entrance) */
+  .flash-overlay { position: absolute; inset: 0; z-index: 3; pointer-events: none; border-radius: inherit; opacity: 0; }
+  .flash-overlay.good { background: radial-gradient(circle at 50% 45%, rgba(46,125,79,0.5), transparent 70%); animation: flashFade .7s ease forwards; }
+  .flash-overlay.bad  { background: radial-gradient(circle at 50% 45%, rgba(155,34,38,0.5), transparent 70%); animation: flashFade .6s ease forwards; }
+  @keyframes flashFade { 0%{ opacity: 0; } 25%{ opacity: 1; } 100%{ opacity: 0; } }
+
+  /* question/options entrance transition */
+  @keyframes qIn { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: translateY(0); } }
+  .q-anim { animation: qIn .4s ease both; }
+
+  /* golden sparkle celebration */
+  .sparkle-layer { position: absolute; inset: 0; pointer-events: none; overflow: hidden; z-index: 4; }
+  .sparkle {
+    position: absolute; font-size: var(--sz, 18px); top: var(--sy, 50%); left: var(--sx, 50%);
+    animation: spark var(--sd, 900ms) ease-out forwards;
+    transform: translate(-50%, -50%);
+  }
+  @keyframes spark {
+    0% { opacity: 0; transform: translate(-50%,-50%) scale(.3) rotate(0deg); }
+    20% { opacity: 1; }
+    100% { opacity: 0; transform: translate(calc(-50% + var(--dx,0)), calc(-50% + var(--dy,0))) scale(1.1) rotate(var(--rot,180deg)); }
+  }
+
+  /* ===== Leaderboard / Hall of Fame ===== */
+  .leaderboard { margin-top: 26px; }
+  .leaderboard:empty { display: none; }
+  .lb-title {
+    font-family:'Cinzel',serif; font-weight:900; font-size:18px; letter-spacing:1px;
+    color:#5a3e0b; text-align:center; margin-bottom: 4px;
+  }
+  .lb-sub { text-align:center; font-style:italic; color:#6b5530; font-size:13px; margin-bottom: 12px; }
+  .lb-list { list-style:none; display:flex; flex-direction:column; gap:7px; }
+  .lb-row {
+    display:flex; align-items:center; gap:10px;
+    padding: 9px 12px; border-radius: 10px;
+    background: rgba(255,255,255,0.5);
+    border: 1px solid #cdb98a;
+  }
+  .lb-row.me { border-color: var(--gold); box-shadow: 0 0 0 2px rgba(240,199,94,0.5); background: rgba(240,199,94,0.2); }
+  .lb-rank { font-family:'Cinzel',serif; font-weight:700; width: 26px; text-align:center; color:#8a6d2f; }
+  .lb-name { flex:1; font-weight:600; color: var(--ink); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .lb-name img, .lb-name svg { width:14px; height:18px; object-fit:contain; vertical-align:-3px; margin-right:5px; }
+  .lb-meta { font-size:12px; font-style:italic; color:#6b5530; }
+  .lb-score { font-family:'Cinzel',serif; font-weight:900; color:#5a3e0b; min-width:34px; text-align:right; }
+  .lb-empty { text-align:center; font-style:italic; color:#6b5530; font-size:14px; padding: 6px 0 2px; }
+  .lb-clear {
+    display:block; margin: 12px auto 0; font-family:'EB Garamond',serif; font-style:italic;
+    font-size:13px; color: var(--wrong); background:none; border:none; cursor:pointer;
+    text-decoration: underline; opacity:.85;
+  }
+  .lb-clear:hover { opacity: 1; }
+
+  /* ===== Wide, short start screen ===== */
+  #start-screen { padding: 24px 36px 28px; }
+  #start-screen .crest { font-size: 36px; margin-bottom: 2px; }
+  #start-screen h1 { font-size: 30px; }
+  #start-screen .subtitle { margin-bottom: 16px; font-size: 16px; }
+  #start-screen .field-label { margin-bottom: 8px; }
+
+  #start-screen .houses { grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 18px; }
+  #start-screen .house { padding: 14px 8px 12px; }
+  #start-screen .house::after { inset: 7px; }
+  #start-screen .house .emoji { margin-bottom: 6px; }
+  #start-screen .house .emoji img, #start-screen .house .emoji svg { width: 52px; height: 58px; }
+  #start-screen .house .name { font-size: 15px; letter-spacing: 1px; }
+  #start-screen .house .name::after { margin: 3px 0 1px; font-size: 9px; }
+  #start-screen .house .traits { font-size: 12px; }
+
+  .start-row { display: grid; grid-template-columns: 1fr 1.5fr; gap: 24px; align-items: start; }
+  .start-row .start-col { min-width: 0; }
+  .start-row input[type="text"] { margin-bottom: 0; }
+  .start-row .difficulties { margin-bottom: 0; }
+  #start-screen input[type="text"] { padding: 13px 15px; }
+  #start-screen .diff { padding: 10px 6px; }
+  #start-screen .diff .d-sub { margin: 1px 0 3px; }
+  #start-screen .btn { margin-top: 16px; }
+  #start-screen .leaderboard { margin-top: 18px; }
+
+  /* ===== Responsive ===== */
+  @media (max-width: 880px) {
+    #start-screen .houses { grid-template-columns: repeat(2, 1fr); }
+    #start-screen .house .emoji img, #start-screen .house .emoji svg { width: 60px; height: 66px; }
+    .start-row { grid-template-columns: 1fr; gap: 16px; }
+    .start-row input[type="text"] { margin-bottom: 0; }
+  }
+  @media (max-width: 560px) {
+    body { padding: 14px; }
+    .card { padding: 26px 18px; border-radius: 14px; }
+    #start-screen { padding: 22px 18px 24px; }
+    .crest { font-size: 40px; }
+    h1 { font-size: 26px; }
+    .houses, #start-screen .houses { grid-template-columns: 1fr; }
+    .difficulties { grid-template-columns: repeat(3, 1fr); }
+    .diff { padding: 10px 4px; }
+    .diff .d-sub { margin: 1px 0 3px; }
+    .hud { flex-direction: column; align-items: stretch; gap: 10px; }
+    .who { justify-content: center; }
+    .hud-right { justify-content: center; }
+    .question { font-size: 20px; min-height: 0; }
+    .option { font-size: 17px; padding: 15px 14px; min-height: 56px; }
+    .result-score { font-size: 52px; }
+    .sound-toggle { width: 40px; height: 40px; font-size: 18px; top: 10px; right: 10px; }
+  }
+  @media (max-width: 380px) {
+    .option .letter { flex-basis: 30px; width: 30px; height: 30px; }
+    .difficulties { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+  <!-- The Marauder's Map — animated parchment background for every screen -->
+  <div class="map-bg" id="map-bg" aria-hidden="true"></div>
+
+  <button class="sound-toggle" id="sound-toggle" title="Toggle sound" aria-label="Toggle sound">🔊</button>
+
+  <div class="stage">
+    <!-- ============ START SCREEN ============ -->
+    <section class="card" id="start-screen">
+      <div class="crest">⚡️</div>
+      <h1>Hogwarts Trivia</h1>
+      <p class="subtitle">Prove your wizarding knowledge</p>
+
+      <label class="field-label">Choose Your House</label>
+      <div class="houses" id="houses">
+        <div class="house gryffindor" data-house="Gryffindor" tabindex="0"
+             title="Founded by Godric Gryffindor · Element: Fire · Ghost: Sir Nicholas (Nearly Headless Nick) · Tower entered past the Fat Lady">
+          <span class="emoji">🦁</span>
+          <span class="name">Gryffindor</span>
+          <div class="traits">Brave &amp; daring</div>
+        </div>
+        <div class="house slytherin" data-house="Slytherin" tabindex="0"
+             title="Founded by Salazar Slytherin · Element: Water · Ghost: The Bloody Baron · Common room beneath the Black Lake">
+          <span class="emoji">🐍</span>
+          <span class="name">Slytherin</span>
+          <div class="traits">Cunning &amp; ambitious</div>
+        </div>
+        <div class="house ravenclaw" data-house="Ravenclaw" tabindex="0"
+             title="Founded by Rowena Ravenclaw · Element: Air · Ghost: The Grey Lady (Helena Ravenclaw) · Enter by answering a riddle">
+          <span class="emoji">🦅</span>
+          <span class="name">Ravenclaw</span>
+          <div class="traits">Wise &amp; witty</div>
+        </div>
+        <div class="house hufflepuff" data-house="Hufflepuff" tabindex="0"
+             title="Founded by Helga Hufflepuff · Element: Earth · Ghost: The Fat Friar · Common room beside the kitchens">
+          <span class="emoji">🦡</span>
+          <span class="name">Hufflepuff</span>
+          <div class="traits">Loyal &amp; kind</div>
+        </div>
+      </div>
+
+      <div class="start-row">
+        <div class="start-col">
+          <label class="field-label" for="name">Your Wizard Name</label>
+          <input type="text" id="name" placeholder="e.g. Hermione Granger" autocomplete="off" maxlength="30" />
+        </div>
+        <div class="start-col">
+          <label class="field-label">Choose Your Difficulty</label>
+          <div class="difficulties" id="difficulties">
+            <div class="diff" data-diff="easy" tabindex="0">
+              <span class="d-name">Easy</span>
+              <span class="d-sub">First Year</span>
+              <span class="d-time">⏳ 30s</span>
+            </div>
+            <div class="diff selected" data-diff="medium" tabindex="0">
+              <span class="d-name">Medium</span>
+              <span class="d-sub">O.W.L.</span>
+              <span class="d-time">⏳ 20s</span>
+            </div>
+            <div class="diff" data-diff="hard" tabindex="0">
+              <span class="d-name">Hard</span>
+              <span class="d-sub">N.E.W.T.</span>
+              <span class="d-time">⏳ 12s</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="err" id="start-err"></div>
+      <button class="btn" id="start-btn">Begin the Challenge →</button>
+
+      <div class="leaderboard" id="leaderboard-start"></div>
+    </section>
+
+    <!-- ============ QUIZ SCREEN ============ -->
+    <section class="card hidden" id="quiz-screen">
+      <div class="hud">
+        <div class="who">
+          <span class="badge" id="player-badge">🏰 House</span>
+          <span id="player-name">Wizard</span>
+        </div>
+        <div class="hud-right">
+          <span class="diff-pill" id="diff-pill">Medium</span>
+          <span class="score-pill" id="score-pill">Score: 0</span>
+        </div>
+      </div>
+
+      <div class="progress-wrap"><div class="progress-bar" id="progress-bar"></div></div>
+
+      <div class="timer-row">
+        <span class="hourglass" id="hourglass">⏳</span>
+        <div class="timer-wrap"><div class="timer-bar" id="timer-bar"></div></div>
+        <span class="timer-num" id="timer-num">20</span>
+      </div>
+
+      <div class="q-count" id="q-count">Question 1 of 5</div>
+      <div class="question" id="question">…</div>
+
+      <div class="options" id="options"></div>
+
+      <div class="feedback" id="feedback"></div>
+
+      <button class="btn hidden" id="next-btn">Next →</button>
+    </section>
+
+    <!-- ============ RESULTS SCREEN ============ -->
+    <section class="card hidden" id="result-screen">
+      <div class="crest" id="result-crest">🏆</div>
+      <h1 id="result-title">Well done!</h1>
+      <p class="subtitle" id="result-sub">Your final tally from the Great Hall</p>
+
+      <div class="result-score" id="result-score">0</div>
+      <div class="result-out" id="result-out">out of 5</div>
+
+      <div class="rank" id="result-rank"></div>
+      <p class="rank-msg" id="result-msg"></p>
+
+      <div class="leaderboard" id="leaderboard-result"></div>
+
+      <button class="btn" id="restart-btn">Play Again ↺</button>
+      <p class="footer-note">Mischief managed. 🪄</p>
+    </section>
+  </div>
+
+<script>
+  // ---------- Data ----------
+  const QUESTIONS = [
+    {
+      q: "What position does Harry Potter play on the Gryffindor Quidditch team?",
+      options: ["Keeper", "Beater", "Seeker", "Chaser"],
+      answer: 2,
+      note: "He catches the Golden Snitch."
+    },
+    {
+      q: "What is the name of Harry's pet owl?",
+      options: ["Errol", "Hedwig", "Crookshanks", "Scabbers"],
+      answer: 1,
+      note: "A snowy owl gifted by Hagrid."
+    },
+    {
+      q: "Which spell is used to disarm an opponent?",
+      options: ["Expelliarmus", "Lumos", "Wingardium Leviosa", "Alohomora"],
+      answer: 0,
+      note: "Harry's signature spell."
+    },
+    {
+      q: "What is the name of the three-headed dog guarding the Philosopher's Stone?",
+      options: ["Norbert", "Aragog", "Fluffy", "Fang"],
+      answer: 2,
+      note: "Owned, of course, by Hagrid."
+    },
+    {
+      q: "Who is the Half-Blood Prince?",
+      options: ["Sirius Black", "Tom Riddle", "Severus Snape", "Remus Lupin"],
+      answer: 2,
+      note: "His mother was Eileen Prince."
+    }
+  ];
+
+  const HOUSE_COLORS = {
+    Gryffindor: { primary: "#740001", secondary: "#d3a625", accent: "#eeba30", emoji: "🦁" },
+    Slytherin:  { primary: "#1a472a", secondary: "#aaaaaa", accent: "#2a623d", emoji: "🐍" },
+    Ravenclaw:  { primary: "#0e1a40", secondary: "#946b2d", accent: "#5d5d5d", emoji: "🦅" },
+    Hufflepuff: { primary: "#a6741a", secondary: "#372e29", accent: "#ecb939", emoji: "🦡" }
+  };
+
+  // ---------- House crests (hand-drawn SVG heraldry) ----------
+  // Wrap any inner artwork in a heraldic shield with the house field colors.
+  function shield(inner, bg1, bg2, border) {
+    return `<svg viewBox="0 0 100 122" xmlns="http://www.w3.org/2000/svg" role="img">
+      <defs>
+        <linearGradient id="g_${bg2.replace('#','')}" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stop-color="${bg1}"/><stop offset="1" stop-color="${bg2}"/>
+        </linearGradient>
+      </defs>
+      <path d="M50 3 L94 18 L94 60 C94 90 74 109 50 118 C26 109 6 90 6 60 L6 18 Z"
+            fill="url(#g_${bg2.replace('#','')})" stroke="${border}" stroke-width="3.5"/>
+      <path d="M50 3 L94 18 L94 60 C94 90 74 109 50 118 C26 109 6 90 6 60 L6 18 Z"
+            fill="none" stroke="rgba(255,255,255,0.12)" stroke-width="1.2" transform="scale(0.9) translate(5.5,6)"/>
+      ${inner}
+    </svg>`;
+  }
+
+  // Lion's mane built as a starburst of points, then a face.
+  function lionInner() {
+    const cx = 50, cy = 52, spikes = 16, rOut = 30, rIn = 21;
+    let pts = "";
+    for (let i = 0; i < spikes * 2; i++) {
+      const r = i % 2 === 0 ? rOut : rIn;
+      const a = (Math.PI / spikes) * i - Math.PI / 2;
+      pts += `${(cx + r * Math.cos(a)).toFixed(1)},${(cy + r * Math.sin(a)).toFixed(1)} `;
+    }
+    return `
+      <polygon points="${pts.trim()}" fill="#f0c75e" stroke="#9c7415" stroke-width="1"/>
+      <circle cx="42" cy="48" r="4.5" fill="#f0c75e"/>
+      <circle cx="58" cy="48" r="4.5" fill="#f0c75e"/>
+      <circle cx="${cx}" cy="${cy}" r="18" fill="#d3a625"/>
+      <circle cx="44" cy="49" r="2.6" fill="#3a2a08"/>
+      <circle cx="56" cy="49" r="2.6" fill="#3a2a08"/>
+      <path d="M50 53 L46 58 L54 58 Z" fill="#3a2a08"/>
+      <path d="M50 58 Q50 64 45 64 M50 58 Q50 64 55 64" stroke="#3a2a08" stroke-width="1.8" fill="none" stroke-linecap="round"/>`;
+  }
+
+  // Slytherin serpent: a silver S-curve with a head and forked tongue.
+  function serpentInner() {
+    return `
+      <path d="M56 26 C38 32 40 46 50 54 C60 62 60 76 42 84"
+            fill="none" stroke="#cfcfcf" stroke-width="8.5" stroke-linecap="round"/>
+      <path d="M56 26 C38 32 40 46 50 54 C60 62 60 76 42 84"
+            fill="none" stroke="#8f8f8f" stroke-width="3" stroke-linecap="round" stroke-dasharray="2 7"/>
+      <circle cx="42" cy="84" r="6.5" fill="#cfcfcf"/>
+      <circle cx="40" cy="83" r="1.6" fill="#1a472a"/>
+      <path d="M36 86 L29 90 M36 88 L30 93" stroke="#9b2226" stroke-width="1.6" stroke-linecap="round"/>
+      <circle cx="56" cy="26" r="3" fill="#eeeeee"/>`;
+  }
+
+  // Ravenclaw eagle: a bronze spread-wing bird (wings mirrored via transform).
+  function eagleInner() {
+    const wing = `<path d="M50 46 C36 32 22 32 11 41 C24 41 33 47 41 55 C31 53 22 57 16 65 C29 61 41 62 50 68 Z"
+                   fill="#c08b3e" stroke="#7c5a23" stroke-width="0.8"/>`;
+    return `
+      ${wing}
+      <g transform="translate(100,0) scale(-1,1)">${wing}</g>
+      <path d="M45 42 L45 74 L55 74 L55 42 Z" fill="#c08b3e"/>
+      <path d="M44 74 L39 92 L50 84 L61 92 L56 74 Z" fill="#c08b3e" stroke="#7c5a23" stroke-width="0.8"/>
+      <circle cx="50" cy="36" r="7" fill="#c08b3e"/>
+      <path d="M56 34 L66 37 L56 40 Z" fill="#eeba30"/>
+      <circle cx="52" cy="35" r="1.8" fill="#0e1a40"/>`;
+  }
+
+  // Hufflepuff badger: white face with two black stripes, dark nose.
+  function badgerInner() {
+    const stripe = `<path d="M42 30 C34 46 36 66 46 80 L40 82 C29 66 27 44 35 30 Z" fill="#2b2113"/>`;
+    return `
+      <path d="M50 28 C65 28 73 41 71 56 C69 73 59 84 50 90 C41 84 31 73 29 56 C27 41 35 28 50 28 Z"
+            fill="#f7f2e3" stroke="#cbb98a" stroke-width="1"/>
+      ${stripe}
+      <g transform="translate(100,0) scale(-1,1)">${stripe}</g>
+      <ellipse cx="50" cy="60" rx="9" ry="11" fill="#f7f2e3"/>
+      <path d="M50 84 L44 76 L56 76 Z" fill="#2b2113"/>
+      <circle cx="50" cy="71" r="2.2" fill="#2b2113"/>`;
+  }
+
+  const HOUSE_CRESTS = {
+    Gryffindor: shield(lionInner(),    "#9b1113", "#5e0001", "#eeba30"),
+    Slytherin:  shield(serpentInner(), "#2a623d", "#10331f", "#d9d9d9"),
+    Ravenclaw:  shield(eagleInner(),   "#26356b", "#0c1530", "#c08b3e"),
+    Hufflepuff: shield(badgerInner(),  "#f0c64a", "#caa12c", "#372e29")
+  };
+
+  // Real heraldic house crests — freely-licensed coats of arms from Wikimedia Commons.
+  const HOUSE_IMG = {
+    Gryffindor: "https://commons.wikimedia.org/wiki/Special:FilePath/Blason_Gryffondor.svg?width=320",
+    Slytherin:  "https://commons.wikimedia.org/wiki/Special:FilePath/Blason_Serpentard.svg?width=320",
+    Ravenclaw:  "https://commons.wikimedia.org/wiki/Special:FilePath/Blason_Serdaigle.svg?width=320",
+    Hufflepuff: "https://commons.wikimedia.org/wiki/Special:FilePath/Blason_Poufsouffle.svg?width=320"
+  };
+
+  // Use the real crest image; if it ever fails to load, fall back to the drawn SVG.
+  window.crestFallback = (img, house) => { img.outerHTML = HOUSE_CRESTS[house]; };
+  function crestMarkup(house) {
+    return `<img src="${HOUSE_IMG[house]}" alt="${house} crest" decoding="async" onerror="crestFallback(this,'${house}')">`;
+  }
+
+  const LETTERS = ["A", "B", "C", "D"];
+
+  // ---------- Difficulty ----------
+  const DIFFICULTY = {
+    easy:   { label: "Easy",   time: 30 },
+    medium: { label: "Medium", time: 20 },
+    hard:   { label: "Hard",   time: 12 }
+  };
+
+  // ---------- State ----------
+  let player = { name: "", house: "" };
+  let current = 0;
+  let score = 0;
+  let answered = false;
+  let selectedDifficulty = "medium";
+  let timerId = null;       // 1-second countdown interval
+  let timeLeft = 0;
+  const LB_KEY = "hp_leaderboard";
+  const SOUND_KEY = "hp_sound";
+
+  // ---------- Elements ----------
+  const $ = (id) => document.getElementById(id);
+  const startScreen = $("start-screen");
+  const quizScreen = $("quiz-screen");
+  const resultScreen = $("result-screen");
+
+  // ---------- The Marauder's Map (interactive, living parchment background) ----------
+  (function maraudersMap() {
+    const SVGNS = "http://www.w3.org/2000/svg";
+    const reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+    // Rooms keyed by id; rects use top-left + size, circles (towers) use centre + r.
+    const R = {
+      astro:  { t: "c", x: 150,  y: 158, r: 46, label: "Astronomy Tower", lab: "below" },
+      gryff:  { t: "c", x: 1052, y: 152, r: 50, label: "Gryffindor Tower", lab: "below" },
+      raven:  { t: "c", x: 1055, y: 648, r: 46, label: "Ravenclaw Tower", lab: "above" },
+      owlery: { t: "c", x: 148,  y: 648, r: 38, label: "Owlery", lab: "above" },
+      hall:   { t: "r", x: 505, y: 320, w: 190, h: 108, label: "The Great Hall" },
+      ent:    { t: "r", x: 522, y: 452, w: 156, h: 54,  label: "Entrance Hall" },
+      dung:   { t: "r", x: 500, y: 540, w: 200, h: 78,  label: "The Dungeons" },
+      lib:    { t: "r", x: 250, y: 318, w: 150, h: 100, label: "Library" },
+      hosp:   { t: "r", x: 800, y: 318, w: 160, h: 96,  label: "Hospital Wing" },
+      ror:    { t: "r", x: 812, y: 540, w: 196, h: 82,  label: "Room of Requirement" },
+      trophy: { t: "r", x: 250, y: 540, w: 150, h: 72,  label: "Trophy Room" },
+      kitchen:{ t: "r", x: 520, y: 648, w: 160, h: 60,  label: "Kitchens" },
+      charms: { t: "r", x: 800, y: 452, w: 150, h: 54,  label: "Charms" }
+    };
+    const C = (id) => {
+      const r = R[id];
+      return r.t === "c" ? [r.x, r.y] : [r.x + r.w / 2, r.y + r.h / 2];
+    };
+
+    // Corridors drawn as double-walled passages.
+    const CORRIDORS = [
+      ["hall","ent"], ["ent","dung"], ["dung","kitchen"], ["hall","lib"],
+      ["lib","trophy"], ["lib","astro"], ["hall","hosp"], ["hosp","charms"],
+      ["charms","ror"], ["ror","raven"], ["dung","ror"], ["hall","gryff"],
+      ["lib","owlery"], ["trophy","dung"], ["hosp","gryff"], ["ent","charms"]
+    ];
+
+    // Out-and-back closed loop helper (seamless looping along corridors).
+    const oab = (...ids) => ids.concat(ids.slice(1, -1).reverse());
+    const CHARACTERS = [
+      { name: "Harry Potter",       speed: 40, route: oab("gryff","hall","ent","dung") },
+      { name: "Hermione Granger",   speed: 44, route: oab("lib","hall","hosp","charms") },
+      { name: "Ron Weasley",        speed: 38, route: oab("gryff","hall","lib","astro") },
+      { name: "Severus Snape",      speed: 30, route: oab("dung","ent","hall","lib","trophy") },
+      { name: "Albus Dumbledore",   speed: 28, route: oab("astro","lib","hall","hosp","charms","ror","raven") },
+      { name: "Sirius Black",       speed: 46, route: oab("raven","ror","dung","kitchen") },
+      { name: "Peter Pettigrew",    speed: 50, route: oab("owlery","lib","trophy","dung","kitchen") },
+      { name: "Minerva McGonagall", speed: 34, route: oab("gryff","hosp","charms","hall") },
+      { name: "Argus Filch",        speed: 26, route: oab("trophy","dung","ent","charms") },
+      { name: "Neville Longbottom", speed: 36, route: oab("gryff","hall","kitchen") },
+      { name: "Luna Lovegood",      speed: 32, route: oab("raven","charms","hall","astro") },
+      { name: "Draco Malfoy",       speed: 42, route: oab("dung","ent","hall","hosp") }
+    ];
+
+    // ----- Build the static map markup -----
+    let g = "";
+
+    // Reusable footprint glyph
+    g += `<defs><g id="footMark">
+            <ellipse cx="0" cy="0" rx="2.5" ry="4.1"/>
+            <ellipse cx="0" cy="-4.6" rx="1.5" ry="1.3"/>
+          </g></defs>`;
+
+    // Decorative double border + corner hatching
+    g += `<rect x="14" y="14" width="1172" height="772" rx="6" class="m-frame"/>`;
+    g += `<rect x="26" y="26" width="1148" height="748" rx="4" class="m-frame thin"/>`;
+    for (let i = 0; i < 6; i++) {
+      const o = 30 + i * 9;
+      g += `<line x1="14" y1="${14 + o}" x2="${14 + o}" y2="14" class="m-hatch"/>`;
+      g += `<line x1="1186" y1="${786 - o}" x2="${1186 - o}" y2="786" class="m-hatch"/>`;
+    }
+
+    // Title + signatures
+    g += `<text x="600" y="60" class="m-title">The Marauder's Map</text>`;
+    g += `<text x="600" y="82" class="m-makers">Moony · Wormtail · Padfoot · Prongs</text>`;
+    g += `<text x="600" y="768" class="m-makers">Every corridor, every passage, every secret — faithfully charted</text>`;
+
+    // Compass rose
+    g += `<g transform="translate(1108,116)" class="m-compass">
+            <circle r="26" class="m-line"/><circle r="18" class="m-line" style="opacity:.35"/>
+            <path d="M0,-30 L6,0 L0,30 L-6,0 Z" class="m-ink-fill"/>
+            <path d="M-30,0 L0,-6 L30,0 L0,6 Z" class="m-ink-soft"/>
+            <text x="0" y="-32" class="m-compass-n">N</text>
+          </g>`;
+
+    // Double-walled corridors
+    CORRIDORS.forEach(([a, b]) => {
+      const p1 = C(a), p2 = C(b);
+      const dx = p2[0] - p1[0], dy = p2[1] - p1[1];
+      const len = Math.hypot(dx, dy) || 1;
+      const nx = -dy / len * 5, ny = dx / len * 5; // perpendicular offset = wall spacing
+      g += `<line x1="${(p1[0]+nx).toFixed(1)}" y1="${(p1[1]+ny).toFixed(1)}" x2="${(p2[0]+nx).toFixed(1)}" y2="${(p2[1]+ny).toFixed(1)}" class="m-wall"/>`;
+      g += `<line x1="${(p1[0]-nx).toFixed(1)}" y1="${(p1[1]-ny).toFixed(1)}" x2="${(p2[0]-nx).toFixed(1)}" y2="${(p2[1]-ny).toFixed(1)}" class="m-wall"/>`;
+      g += `<line x1="${p1[0]}" y1="${p1[1]}" x2="${p2[0]}" y2="${p2[1]}" class="m-corridor"/>`;
+    });
+
+    // Rooms & towers
+    Object.values(R).forEach(r => {
+      if (r.t === "r") {
+        g += `<rect x="${r.x}" y="${r.y}" width="${r.w}" height="${r.h}" rx="3" class="m-room"/>`;
+        g += `<rect x="${r.x+4}" y="${r.y+4}" width="${r.w-8}" height="${r.h-8}" rx="2" class="m-room thin"/>`;
+        g += `<text x="${r.x + r.w/2}" y="${r.y + r.h/2 + 5}" class="m-label">${r.label}</text>`;
+      } else {
+        g += `<circle cx="${r.x}" cy="${r.y}" r="${r.r}" class="m-room"/>`;
+        g += `<circle cx="${r.x}" cy="${r.y}" r="${r.r-7}" class="m-room thin"/>`;
+        // crenellations
+        for (let k = 0; k < 12; k++) {
+          const a = (Math.PI*2*k)/12;
+          const x1 = r.x + Math.cos(a)*(r.r-7), y1 = r.y + Math.sin(a)*(r.r-7);
+          const x2 = r.x + Math.cos(a)*r.r,     y2 = r.y + Math.sin(a)*r.r;
+          g += `<line x1="${x1.toFixed(1)}" y1="${y1.toFixed(1)}" x2="${x2.toFixed(1)}" y2="${y2.toFixed(1)}" class="m-hatch" style="opacity:.4"/>`;
+        }
+        const ly = r.lab === "above" ? r.y - r.r - 10 : r.y + r.r + 20;
+        g += `<text x="${r.x}" y="${ly}" class="m-label">${r.label}</text>`;
+      }
+    });
+
+    // Moving staircases (swing gently)
+    function staircase(cx, cy, steps, dir) {
+      let s = `<g class="m-stair" transform="translate(${cx},${cy})" style="animation-duration:${7 + dir*2.5}s">`;
+      s += `<rect x="-26" y="-34" width="52" height="68" rx="3" class="m-room thin"/>`;
+      for (let i = 0; i < steps; i++) {
+        const yy = -30 + i * (60 / steps);
+        s += `<line x1="-22" y1="${yy.toFixed(1)}" x2="22" y2="${yy.toFixed(1)}" class="m-wall" style="opacity:.45"/>`;
+      }
+      s += `<line x1="-22" y1="-32" x2="-22" y2="32" class="m-wall"/>`;
+      s += `<line x1="22" y1="-32" x2="22" y2="32" class="m-wall"/>`;
+      s += `</g>`;
+      return s;
+    }
+    g += staircase(430, 478, 7, 0);
+    g += staircase(762, 478, 7, 1);
+
+    // A secret passage winding off toward Hogsmeade
+    g += `<path class="m-secret" d="M500,580 C420,610 380,540 300,560 C220,580 180,520 120,540"/>`;
+    g += `<text x="150" y="520" class="m-label" style="font-size:12px;opacity:.5">Passage to Hogsmeade</text>`;
+
+    // Layers for the animated footprints + name tags (populated by JS)
+    g += `<g id="m-feet-layer"></g><g id="m-name-layer"></g>`;
+
+    $("map-bg").innerHTML =
+      `<svg viewBox="0 0 1200 800" preserveAspectRatio="xMidYMid slice" xmlns="${SVGNS}">${g}</svg>`;
+
+    const svg = $("map-bg").querySelector("svg");
+    const footLayer = svg.querySelector("#m-feet-layer");
+    const nameLayer = svg.querySelector("#m-name-layer");
+
+    // ----- Precompute route geometry -----
+    const STEP = 17;       // px between footprints
+    const FOOT_LIFE = 3.6; // seconds a footprint lingers
+    const walkers = CHARACTERS.map((ch, idx) => {
+      const pts = ch.route.map(C);
+      pts.push(pts[0]); // close the loop
+      const seg = [];
+      let total = 0;
+      for (let i = 0; i < pts.length - 1; i++) {
+        const dx = pts[i+1][0] - pts[i][0], dy = pts[i+1][1] - pts[i][1];
+        const l = Math.hypot(dx, dy);
+        seg.push({ x: pts[i][0], y: pts[i][1], dx, dy, l });
+        total += l;
+      }
+      const nameEl = document.createElementNS(SVGNS, "text");
+      nameEl.setAttribute("class", "m-name");
+      nameEl.textContent = ch.name;
+      nameLayer.appendChild(nameEl);
+      return {
+        seg, total, speed: ch.speed,
+        odo: (idx * 53) % total,           // spread starting positions
+        lastFoot: (idx * 53) % total,
+        side: idx % 2 ? 1 : -1,
+        nameEl
+      };
+    });
+
+    function pointAt(w, d) {
+      let acc = 0;
+      for (let i = 0; i < w.seg.length; i++) {
+        const s = w.seg[i];
+        if (acc + s.l >= d || i === w.seg.length - 1) {
+          const t = s.l ? (d - acc) / s.l : 0;
+          return {
+            x: s.x + s.dx * t,
+            y: s.y + s.dy * t,
+            ang: Math.atan2(s.dy, s.dx) * 180 / Math.PI + 90
+          };
+        }
+        acc += s.l;
+      }
+      return { x: w.seg[0].x, y: w.seg[0].y, ang: 0 };
+    }
+
+    function dropFoot(x, y, ang, side, animate) {
+      const rad = (ang - 90) * Math.PI / 180;
+      const px = Math.cos(rad + Math.PI / 2) * 3.2 * side;
+      const py = Math.sin(rad + Math.PI / 2) * 3.2 * side;
+      const use = document.createElementNS(SVGNS, "use");
+      use.setAttributeNS("http://www.w3.org/1999/xlink", "href", "#footMark");
+      use.setAttribute("href", "#footMark");
+      use.setAttribute("transform", `translate(${(x+px).toFixed(1)},${(y+py).toFixed(1)}) rotate(${ang.toFixed(1)})`);
+      if (animate) {
+        use.setAttribute("class", "foot");
+        use.style.setProperty("--life", FOOT_LIFE + "s");
+        use.addEventListener("animationend", () => use.remove());
+      } else {
+        use.setAttribute("class", "foot static");
+      }
+      footLayer.appendChild(use);
+    }
+
+    // Reduced motion: lay down a static trail and park the name tags.
+    if (reduce) {
+      walkers.forEach(w => {
+        for (let d = 0; d < w.total; d += STEP * 2) {
+          const p = pointAt(w, d);
+          dropFoot(p.x, p.y, p.ang, (Math.round(d / STEP) % 2 ? 1 : -1), false);
+        }
+        const p0 = pointAt(w, 0);
+        w.nameEl.setAttribute("x", p0.x.toFixed(1));
+        w.nameEl.setAttribute("y", (p0.y - 13).toFixed(1));
+      });
+      return;
+    }
+
+    // ----- Animate -----
+    let last = performance.now();
+    function frame(now) {
+      const dt = Math.min(0.05, (now - last) / 1000);
+      last = now;
+      walkers.forEach(w => {
+        w.odo += w.speed * dt;
+        const lead = pointAt(w, w.odo % w.total);
+        w.nameEl.setAttribute("x", lead.x.toFixed(1));
+        w.nameEl.setAttribute("y", (lead.y - 13).toFixed(1));
+        while (w.odo - w.lastFoot >= STEP) {
+          w.lastFoot += STEP;
+          const p = pointAt(w, w.lastFoot % w.total);
+          dropFoot(p.x, p.y, p.ang, w.side, true);
+          w.side *= -1;
+        }
+      });
+      requestAnimationFrame(frame);
+    }
+    requestAnimationFrame(frame);
+
+    // ----- Cursor parallax -----
+    let rafPark = false;
+    window.addEventListener("mousemove", (e) => {
+      if (rafPark) return;
+      rafPark = true;
+      requestAnimationFrame(() => {
+        const tx = -((e.clientX / window.innerWidth) - 0.5) * 22;
+        const ty = -((e.clientY / window.innerHeight) - 0.5) * 22;
+        svg.style.transform = `scale(1.06) translate(${tx.toFixed(1)}px, ${ty.toFixed(1)}px)`;
+        rafPark = false;
+      });
+    }, { passive: true });
+  })();
+
+  // ---------- A little something for fellow wizards in the console ----------
+  (function owlPost() {
+    const s1 = "color:#5a4326;font-size:15px;font-weight:bold";
+    const s2 = "color:#7c5a23;font-style:italic";
+    console.log("%c🦉 Owl Post for you, witch or wizard…", s1);
+    console.log("%cHogwarts was founded c. 993 A.D. by Godric Gryffindor, Salazar Slytherin, Rowena Ravenclaw and Helga Hufflepuff.", s2);
+    console.log("%cTip: watch the footprints — Harry, Sirius, Snape and others are patrolling the castle behind you. 👣", s2);
+  })();
+
+  // ---------- Paint house crests into the start cards ----------
+  document.querySelectorAll(".house").forEach((el) => {
+    const emojiSpan = el.querySelector(".emoji");
+    if (emojiSpan) emojiSpan.innerHTML = crestMarkup(el.dataset.house);
+    el.insertAdjacentHTML("afterbegin", '<span class="check" aria-hidden="true">✓</span>');
+  });
+
+  // ---------- House selection ----------
+  let selectedHouse = "";
+  document.querySelectorAll(".house").forEach((el) => {
+    const pick = () => {
+      document.querySelectorAll(".house").forEach(h => h.classList.remove("selected"));
+      el.classList.add("selected");
+      selectedHouse = el.dataset.house;
+      $("start-err").textContent = "";
+    };
+    el.addEventListener("click", pick);
+    el.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); pick(); } });
+  });
+
+  // ---------- Difficulty selection ----------
+  document.querySelectorAll(".diff").forEach((el) => {
+    const pick = () => {
+      document.querySelectorAll(".diff").forEach(d => d.classList.remove("selected"));
+      el.classList.add("selected");
+      selectedDifficulty = el.dataset.diff;
+    };
+    el.addEventListener("click", pick);
+    el.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); pick(); } });
+  });
+
+  // ---------- Sound effects (Web Audio — no files needed) ----------
+  const Sound = (function () {
+    let ctx = null;
+    let soundOn = localStorage.getItem(SOUND_KEY) !== "off";
+    let activeNodes = [];   // so cues never overlap
+
+    function ensure() {
+      if (!ctx) {
+        const AC = window.AudioContext || window.webkitAudioContext;
+        if (AC) ctx = new AC();
+      }
+      if (ctx && ctx.state === "suspended") ctx.resume();
+      return ctx;
+    }
+
+    // Stop anything currently sounding, so quick answers stay clean & separate.
+    function stopAll() {
+      activeNodes.forEach(n => { try { n.stop(); } catch (e) {} });
+      activeNodes = [];
+    }
+
+    // Play a sequence of notes: [{freq, start, dur, type, gain}]
+    function play(notes) {
+      if (!soundOn) return;
+      const c = ensure();
+      if (!c) return;
+      stopAll();
+      const t0 = c.currentTime + 0.01;
+      notes.forEach(n => {
+        const osc = c.createOscillator();
+        const g = c.createGain();
+        osc.type = n.type || "sine";
+        osc.frequency.value = n.freq;
+        const start = t0 + n.start;
+        const peak = n.gain || 0.18;
+        g.gain.setValueAtTime(0.0001, start);
+        g.gain.exponentialRampToValueAtTime(peak, start + 0.02);
+        g.gain.exponentialRampToValueAtTime(0.0001, start + n.dur);
+        osc.connect(g); g.connect(c.destination);
+        osc.start(start);
+        osc.stop(start + n.dur + 0.02);
+        activeNodes.push(osc);
+      });
+    }
+
+    return {
+      correct() { play([
+        { freq: 659.25, start: 0,    dur: 0.12, type: "triangle" },
+        { freq: 880.00, start: 0.10, dur: 0.18, type: "triangle" }
+      ]); },
+      wrong() { play([
+        { freq: 220.00, start: 0,    dur: 0.18, type: "sawtooth", gain: 0.14 },
+        { freq: 146.83, start: 0.12, dur: 0.28, type: "sawtooth", gain: 0.14 }
+      ]); },
+      fanfare() { play([
+        { freq: 523.25, start: 0,    dur: 0.16, type: "triangle" },
+        { freq: 659.25, start: 0.15, dur: 0.16, type: "triangle" },
+        { freq: 783.99, start: 0.30, dur: 0.16, type: "triangle" },
+        { freq: 1046.5, start: 0.45, dur: 0.40, type: "triangle" }
+      ]); },
+      tick() { play([{ freq: 440, start: 0, dur: 0.05, type: "square", gain: 0.05 }]); },
+      isOn() { return soundOn; },
+      toggle() {
+        soundOn = !soundOn;
+        localStorage.setItem(SOUND_KEY, soundOn ? "on" : "off");
+        if (soundOn) ensure();
+        return soundOn;
+      },
+      warmUp() { ensure(); }
+    };
+  })();
+
+  (function initSoundToggle() {
+    const btn = $("sound-toggle");
+    const paint = () => {
+      const on = Sound.isOn();
+      btn.textContent = on ? "🔊" : "🔈";
+      btn.classList.toggle("muted", !on);
+    };
+    paint();
+    btn.addEventListener("click", () => { Sound.toggle(); paint(); });
+  })();
+
+  // ---------- Leaderboard (localStorage) ----------
+  function loadScores() {
+    try { return JSON.parse(localStorage.getItem(LB_KEY)) || []; }
+    catch (e) { return []; }
+  }
+  function saveScore(entry) {
+    const list = loadScores();
+    list.push(entry);
+    list.sort((a, b) => b.score - a.score || a.ts - b.ts); // higher score first; earlier wins ties
+    localStorage.setItem(LB_KEY, JSON.stringify(list.slice(0, 50)));
+  }
+  function clearScores() {
+    localStorage.removeItem(LB_KEY);
+    renderLeaderboard("leaderboard-start");
+    renderLeaderboard("leaderboard-result", highlightTs);
+  }
+  let highlightTs = null;
+
+  function renderLeaderboard(containerId, highlight) {
+    const el = $(containerId);
+    if (!el) return;
+    const top = loadScores().slice(0, 5);
+    // Keep the start screen compact: only show the board there once it has entries.
+    if (containerId === "leaderboard-start" && top.length === 0) { el.innerHTML = ""; return; }
+    let html = `<div class="lb-title">🏆 Hall of Fame</div>`
+             + `<div class="lb-sub">Top five wizards by points earned</div>`;
+    if (top.length === 0) {
+      html += `<div class="lb-empty">No champions yet — be the first to make the board!</div>`;
+    } else {
+      const medals = ["🥇", "🥈", "🥉"];
+      html += `<ul class="lb-list">`;
+      top.forEach((e, i) => {
+        const me = highlight && e.ts === highlight ? " me" : "";
+        const rank = medals[i] || (i + 1);
+        const safeName = String(e.name).replace(/[<>&]/g, "");
+        html += `<li class="lb-row${me}">`
+              + `<span class="lb-rank">${rank}</span>`
+              + `<span class="lb-name">${crestMarkup(e.house)}${safeName}`
+              + `<span class="lb-meta"> · ${e.difficulty || ""}</span></span>`
+              + `<span class="lb-score">${e.score}/${e.total}</span>`
+              + `</li>`;
+      });
+      html += `</ul>`;
+    }
+    html += `<button class="lb-clear" type="button">Clear the Hall of Fame</button>`;
+    el.innerHTML = html;
+    el.querySelector(".lb-clear").addEventListener("click", () => {
+      if (confirm("Banish all records from the Hall of Fame?")) clearScores();
+    });
+  }
+
+  // Show the Hall of Fame on first load (persists across refreshes).
+  renderLeaderboard("leaderboard-start");
+
+  // ---------- Start ----------
+  $("start-btn").addEventListener("click", startQuiz);
+  $("name").addEventListener("keydown", (e) => { if (e.key === "Enter") startQuiz(); });
+
+  function startQuiz() {
+    const name = $("name").value.trim();
+    if (!name) { $("start-err").textContent = "Please enter your wizard name."; return; }
+    if (!selectedHouse) { $("start-err").textContent = "Please choose your house."; return; }
+
+    player.name = name;
+    player.house = selectedHouse;
+    current = 0;
+    score = 0;
+    answered = false;
+
+    Sound.warmUp(); // unlock audio on this user gesture
+
+    applyHouseTheme(selectedHouse);
+
+    $("player-name").textContent = name;
+    $("player-badge").innerHTML = `${crestMarkup(selectedHouse)} ${selectedHouse}`;
+    $("diff-pill").textContent = DIFFICULTY[selectedDifficulty].label;
+
+    document.body.classList.add("quiz-active");
+    startScreen.classList.add("hidden");
+    resultScreen.classList.add("hidden");
+    quizScreen.classList.remove("hidden");
+
+    renderQuestion();
+  }
+
+  function applyHouseTheme(house) {
+    const c = HOUSE_COLORS[house];
+    const root = document.documentElement.style;
+    root.setProperty("--house-primary", c.primary);
+    root.setProperty("--house-secondary", c.secondary);
+    root.setProperty("--house-accent", c.accent);
+  }
+
+  // ---------- Render question ----------
+  function renderQuestion() {
+    answered = false;
+    const item = QUESTIONS[current];
+
+    $("q-count").textContent = `Question ${current + 1} of ${QUESTIONS.length}`;
+    $("question").textContent = item.q;
+    $("score-pill").textContent = `Score: ${score}`;
+    $("progress-bar").style.width = `${(current / QUESTIONS.length) * 100}%`;
+
+    const fb = $("feedback");
+    fb.className = "feedback";
+    fb.textContent = "";
+
+    $("next-btn").classList.add("hidden");
+
+    const box = $("options");
+    box.innerHTML = "";
+    item.options.forEach((text, i) => {
+      const btn = document.createElement("button");
+      btn.className = "option";
+      btn.innerHTML = `<span class="letter">${LETTERS[i]}</span><span>${text}</span>`;
+      btn.addEventListener("click", () => selectAnswer(i, btn));
+      box.appendChild(btn);
+    });
+
+    // Smooth entrance for the question + options (retriggers every question)
+    retrigger($("question"), "q-anim");
+    retrigger(box, "q-anim");
+
+    startTimer(DIFFICULTY[selectedDifficulty].time);
+  }
+
+  // Force a CSS animation to replay by removing the class, reflowing, re-adding.
+  function retrigger(el, cls) {
+    el.classList.remove(cls);
+    void el.offsetWidth;
+    el.classList.add(cls);
+  }
+
+  // ---------- Per-question timer ----------
+  function startTimer(seconds) {
+    clearTimer();
+    timeLeft = seconds;
+    const bar = $("timer-bar");
+    const num = $("timer-num");
+
+    // reset the bar to full, then animate it draining over the full duration
+    bar.classList.remove("warning");
+    num.classList.remove("warning");
+    bar.style.transition = "none";
+    bar.style.width = "100%";
+    void bar.offsetWidth;
+    bar.style.transition = `width ${seconds}s linear`;
+    bar.style.width = "0%";
+
+    num.textContent = timeLeft;
+
+    timerId = setInterval(() => {
+      timeLeft--;
+      num.textContent = Math.max(0, timeLeft);
+      if (timeLeft <= 5) {
+        bar.classList.add("warning");
+        num.classList.add("warning");
+        if (timeLeft > 0) Sound.tick();
+      }
+      if (timeLeft <= 0) {
+        clearTimer();
+        onTimeUp();
+      }
+    }, 1000);
+  }
+
+  function clearTimer() {
+    if (timerId) { clearInterval(timerId); timerId = null; }
+  }
+
+  function onTimeUp() {
+    if (answered) return;
+    answered = true;
+    const item = QUESTIONS[current];
+    const correctIdx = item.answer;
+    document.querySelectorAll(".option").forEach((el, i) => {
+      el.disabled = true;
+      if (i === correctIdx) el.classList.add("correct");
+    });
+    const fb = $("feedback");
+    fb.className = "feedback show bad";
+    fb.innerHTML = `⏳ Time's up! The answer was ${LETTERS[correctIdx]}: ${item.options[correctIdx]}<small>${item.note}</small>`;
+    Sound.wrong();
+    flashCard("flash-bad");
+    revealNext();
+  }
+
+  // ---------- Answer ----------
+  function selectAnswer(index, btn) {
+    if (answered) return;
+    answered = true;
+    clearTimer();
+    freezeTimerBar();
+
+    const item = QUESTIONS[current];
+    const correctIdx = item.answer;
+    const optionEls = document.querySelectorAll(".option");
+
+    optionEls.forEach((el, i) => {
+      el.disabled = true;
+      if (i === correctIdx) el.classList.add("correct");
+    });
+
+    const fb = $("feedback");
+    if (index === correctIdx) {
+      score++;
+      $("score-pill").textContent = `Score: ${score}`;
+      fb.className = "feedback show good";
+      fb.innerHTML = `✓ Correct! +10 points to ${player.house}<small>${item.note}</small>`;
+      Sound.correct();
+      flashCard("flash-good");
+      celebrate();
+    } else {
+      btn.classList.add("wrong");
+      fb.className = "feedback show bad";
+      fb.innerHTML = `✗ Not quite. The answer was ${LETTERS[correctIdx]}: ${item.options[correctIdx]}<small>${item.note}</small>`;
+      Sound.wrong();
+      flashCard("flash-bad");
+    }
+
+    revealNext();
+  }
+
+  // Show the Next / See Results button after an answer is locked in.
+  function revealNext() {
+    const nextBtn = $("next-btn");
+    nextBtn.textContent = current === QUESTIONS.length - 1 ? "See Results →" : "Next →";
+    nextBtn.classList.remove("hidden");
+  }
+
+  // Re-playable card flash (good/bad) via a short-lived overlay element.
+  function flashCard(cls) {
+    const card = $("quiz-screen");
+    const o = document.createElement("div");
+    o.className = "flash-overlay " + (cls === "flash-good" ? "good" : "bad");
+    card.appendChild(o);
+    setTimeout(() => o.remove(), 800);
+  }
+
+  // Freeze the draining timer bar at its current position when answered early.
+  function freezeTimerBar() {
+    const bar = $("timer-bar");
+    const w = getComputedStyle(bar).width;
+    bar.style.transition = "none";
+    bar.style.width = w;
+  }
+
+  // Golden sparkle burst for a correct answer — fresh nodes each time, auto-removed.
+  function celebrate() {
+    const card = $("quiz-screen");
+    const layer = document.createElement("div");
+    layer.className = "sparkle-layer";
+    const glyphs = ["✨", "⭐", "🌟", "✦", "★"];
+    const count = 18;
+    for (let i = 0; i < count; i++) {
+      const s = document.createElement("span");
+      s.className = "sparkle";
+      s.textContent = glyphs[i % glyphs.length];
+      const angle = (Math.PI * 2 * i) / count + (i % 3) * 0.3;
+      const dist = 90 + (i % 5) * 28;
+      s.style.setProperty("--sx", (35 + (i * 37) % 50) + "%");
+      s.style.setProperty("--sy", (30 + (i * 53) % 40) + "%");
+      s.style.setProperty("--dx", Math.cos(angle) * dist + "px");
+      s.style.setProperty("--dy", Math.sin(angle) * dist + "px");
+      s.style.setProperty("--rot", (i % 2 ? 220 : -220) + "deg");
+      s.style.setProperty("--sz", (14 + (i % 4) * 6) + "px");
+      s.style.setProperty("--sd", (800 + (i % 5) * 120) + "ms");
+      layer.appendChild(s);
+    }
+    card.appendChild(layer);
+    setTimeout(() => layer.remove(), 1500);
+  }
+
+  // ---------- Next ----------
+  $("next-btn").addEventListener("click", () => {
+    current++;
+    if (current < QUESTIONS.length) {
+      renderQuestion();
+    } else {
+      showResults();
+    }
+  });
+
+  // ---------- Results ----------
+  function showResults() {
+    clearTimer();
+    quizScreen.classList.add("hidden");
+    resultScreen.classList.remove("hidden");
+
+    const total = QUESTIONS.length;
+    $("result-score").textContent = score;
+    $("result-out").textContent = `out of ${total} — well played, ${player.name} of ${player.house}`;
+
+    let rank, msg, crest;
+    const pct = score / total;
+    if (pct === 1) {
+      rank = "Order of Merlin, First Class"; crest = "🏆";
+      msg = "Flawless! Dumbledore himself would be impressed.";
+    } else if (pct >= 0.8) {
+      rank = "Top of the Class"; crest = "🌟";
+      msg = "Outstanding wizarding knowledge — Hermione would approve.";
+    } else if (pct >= 0.6) {
+      rank = "Prefect Material"; crest = "🎓";
+      msg = "A solid effort. The library awaits for the rest.";
+    } else if (pct >= 0.4) {
+      rank = "Apprentice Wizard"; crest = "📜";
+      msg = "Not bad, but more study at Hogwarts is in order.";
+    } else {
+      rank = "First-Year Muggle-born"; crest = "🪄";
+      msg = "Everyone starts somewhere. Back to Diagon Alley!";
+    }
+
+    $("result-crest").textContent = crest;
+    $("result-rank").textContent = rank;
+    $("result-msg").textContent = msg;
+    $("result-title").textContent = pct >= 0.6 ? "Well done!" : "Keep practising!";
+
+    // Save this result to the Hall of Fame, then show the board.
+    highlightTs = nextTs();
+    saveScore({
+      name: player.name,
+      house: player.house,
+      score: score,
+      total: total,
+      difficulty: DIFFICULTY[selectedDifficulty].label,
+      ts: highlightTs
+    });
+    renderLeaderboard("leaderboard-result", highlightTs);
+    renderLeaderboard("leaderboard-start", highlightTs);
+
+    // A distinct flourish for a high score.
+    if (pct >= 0.8) Sound.fanfare();
+  }
+
+  // Monotonic timestamp without Date (kept simple & deterministic per session).
+  let _tsCounter = 0;
+  function nextTs() {
+    const prev = loadScores().reduce((m, e) => Math.max(m, e.ts || 0), 0);
+    _tsCounter = Math.max(_tsCounter, prev) + 1;
+    return _tsCounter;
+  }
+
+  // ---------- Restart ----------
+  $("restart-btn").addEventListener("click", () => {
+    clearTimer();
+    document.body.classList.remove("quiz-active");
+    resultScreen.classList.add("hidden");
+    startScreen.classList.remove("hidden");
+    // reset start screen
+    $("name").value = "";
+    selectedHouse = "";
+    document.querySelectorAll(".house").forEach(h => h.classList.remove("selected"));
+    $("start-err").textContent = "";
+  });
+</script>
+</body>
+</html>
