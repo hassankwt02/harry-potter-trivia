@@ -24,8 +24,12 @@ npm start
 
 ## ✨ Features
 
+- **Live questions from the [Open Trivia Database](https://opentdb.com/)** — fresh questions every game (no hardcoded content). HTML entities are decoded and answer positions are shuffled each time.
+- **Category & difficulty selection** — pick from 14 categories (General Knowledge, Science, Computers, History, Geography, …) and Easy / Medium / Hard before each game.
+- **Loading & error states** — a themed spinner while questions load, and a clear retry screen if the API fails.
 - **House selection** — Gryffindor, Slytherin, Ravenclaw, Hufflepuff, each with its real heraldic crest.
-- **5 multiple-choice questions** (A–D) with clear right/wrong feedback and fun facts.
+- **10 multiple-choice questions** (A–D) with clear right/wrong feedback.
+- **Score tracking** — results show your tally as a fraction and a percentage, with a correct/incorrect breakdown.
 - **Difficulty levels** — Easy (30s), Medium (20s), Hard (12s) per question, with a live countdown.
 - **Animations** — golden sparkle celebration on correct answers, shake + flash on wrong ones, smooth question transitions.
 - **Sound effects** — generated with the Web Audio API (no audio files): chime for correct, buzz for wrong, fanfare for a high score, plus a mute toggle.
@@ -45,7 +49,8 @@ components/
   MaraudersMap.jsx # animated SVG map background (footprint trails, parallax)
   Crest.jsx        # house crest <img> with SVG fallback
 lib/
-  questions.js     # questions, answer labels, difficulty settings
+  api.js           # Open Trivia DB fetch (HTML decode + answer shuffle)
+  questions.js     # answer labels, difficulty + category settings
   houses.js        # house colours + card metadata
   crests.js        # crest image URLs + hand-drawn SVG fallbacks
   sound.js         # Web Audio sound engine

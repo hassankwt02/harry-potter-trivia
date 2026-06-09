@@ -604,3 +604,63 @@ input[type="text"]:focus {
   .option .letter { flex-basis: 30px; width: 30px; height: 30px; }
   .difficulties { grid-template-columns: 1fr; }
 }
+
+/* ===== Category select ===== */
+.field-select {
+  width: 100%;
+  font-family: 'EB Garamond', serif;
+  font-size: 18px;
+  padding: 13px 15px;
+  border: 2px solid #b89b54;
+  border-radius: 10px;
+  background: rgba(255,255,255,0.6);
+  color: var(--ink);
+  outline: none;
+  cursor: pointer;
+  transition: border-color .2s, box-shadow .2s;
+}
+.field-select:focus { border-color: var(--gold); box-shadow: 0 0 0 4px rgba(211,166,37,0.25); }
+
+/* spacing when stacking fields inside a start column */
+.start-col .field-label:not(:first-child) { margin-top: 14px; }
+.start-col input[type="text"], .start-col .field-select { margin-bottom: 0; }
+
+/* ===== Loading state ===== */
+.loading-wrap { text-align: center; padding: 26px 0 18px; }
+.spinner {
+  width: 64px; height: 64px; margin: 0 auto 18px;
+  border-radius: 50%;
+  border: 6px solid rgba(90,62,11,0.18);
+  border-top-color: var(--gold);
+  animation: spin 0.9s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.loading-text { font-family: 'Cinzel', serif; font-weight: 700; color: #5a3e0b; font-size: 20px; }
+.loading-sub { font-style: italic; color: #6b5530; margin-top: 6px; font-size: 15px; }
+
+/* ===== Error state ===== */
+.error-actions { display: flex; gap: 12px; margin-top: 22px; flex-wrap: wrap; }
+.error-actions .btn { flex: 1; min-width: 160px; }
+.btn-ghost {
+  background: transparent;
+  color: #5a3e0b;
+  border: 2px solid var(--gold);
+  box-shadow: none;
+}
+.btn-ghost:hover:not(:disabled) { background: rgba(211,166,37,0.15); box-shadow: none; }
+
+/* ===== Results score breakdown ===== */
+.score-breakdown {
+  text-align: center;
+  font-family: 'Cinzel', serif;
+  font-size: 15px;
+  color: #6b5530;
+  margin-bottom: 20px;
+}
+
+@media (max-width: 560px) {
+  .error-actions { flex-direction: column; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .spinner { animation-duration: 2s; }
+}

@@ -1,14 +1,13 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { QUESTIONS, LETTERS, DIFFICULTY, DIFF_ORDER } from "../lib/questions";
+import { LETTERS, DIFFICULTY, DIFF_ORDER, CATEGORIES, QUESTION_COUNT } from "../lib/questions";
 import { HOUSES, HOUSE_COLORS } from "../lib/houses";
+import { fetchQuestions } from "../lib/api";
 import { loadScores, saveScore, clearScores, nextTs } from "../lib/leaderboard";
 import { createSound } from "../lib/sound";
 import Crest from "./Crest";
 import MaraudersMap from "./MaraudersMap";
-
-const TOTAL = QUESTIONS.length;
 
 function Leaderboard({ entries, highlight, onClear, hideIfEmpty }) {
   const top = entries.slice(0, 5);
@@ -27,9 +26,9 @@ function Leaderboard({ entries, highlight, onClear, hideIfEmpty }) {
               <span className="lb-rank">{medals[i] || i + 1}</span>
               <span className="lb-name">
                 <Crest house={e.house} />{e.name}
-                <span className="lb-meta"> · {e.difficulty || ""}</span>
+                <span className="lb-meta"> · {e.score}/{e.total} · {e.difficulty || ""}</span>
               </span>
-              <span className="lb-score">{e.score}/{e.total}</span>
+              <span className="lb-score">{e.total ? Math.round((e.score / e.total) * 100) : 0}%</span>
             </li>
           ))}
         </ul>
@@ -40,12 +39,15 @@ function Leaderboard({ entries, highlight, onClear, hideIfEmpty }) {
 }
 
 export default function Game() {
-  const [screen, setScreen] = useState("start");
+  const [screen, setScreen] = useState("start"); // start | loading | quiz | result | error
   const [name, setName] = useState("");
   const [house, setHouse] = useState(null);
   const [difficulty, setDifficulty] = useState("medium");
+  const [category, setCategory] = useState("");
   const [err, setErr] = useState("");
+  const [errorMsg, setErrorMsg] = useState("");
 
+  const [questions, setQuestions] = useState([]);
   const [current, setCurrent] = useState(0);
   const [score, setScore] = useState(0);
   const [answered, setAnswered] = useState(false);
@@ -65,6 +67,8 @@ export default function Game() {
   const answeredRef = useRef(false);
   answeredRef.current = answered;
 
+  const total = questions.length;
+
   // Init sound + load leaderboard on mount (client only).
   useEffect(() => {
     soundRef.current = createSound();
@@ -72,7 +76,7 @@ export default function Game() {
     setLeaderboard(loadScores());
   }, []);
 
-  // House-colored glow + theme variables.
+  // House-colored glow when in a game.
   useEffect(() => {
     const inGame = screen === "quiz" || screen === "result";
     document.body.classList.toggle("quiz-active", inGame);
@@ -90,7 +94,7 @@ export default function Game() {
 
   // Per-question countdown timer (restarts each question).
   useEffect(() => {
-    if (screen !== "quiz") return;
+    if (screen !== "quiz" || !questions[current]) return;
     const seconds = DIFFICULTY[difficulty].time;
     setTimeLeft(seconds);
 
@@ -111,7 +115,7 @@ export default function Game() {
       if (tl <= 0) {
         clearInterval(id);
         if (answeredRef.current) return;
-        const item = QUESTIONS[current];
+        const item = questions[current];
         setAnswered(true);
         setSelectedIdx(null);
         setFeedback({
@@ -165,18 +169,28 @@ export default function Game() {
   }
 
   // ----- Flow -----
-  function begin() {
+  async function begin() {
     if (!name.trim()) { setErr("Please enter your wizard name."); return; }
     if (!house) { setErr("Please choose your house."); return; }
     setErr("");
     if (soundRef.current) soundRef.current.warmUp();
-    setScore(0);
-    setCurrent(0);
-    setAnswered(false);
-    setSelectedIdx(null);
-    setFeedback(null);
-    setResult(null);
-    setScreen("quiz");
+
+    setErrorMsg("");
+    setScreen("loading");
+    try {
+      const qs = await fetchQuestions({ amount: QUESTION_COUNT, category: category || undefined, difficulty });
+      setQuestions(qs);
+      setScore(0);
+      setCurrent(0);
+      setAnswered(false);
+      setSelectedIdx(null);
+      setFeedback(null);
+      setResult(null);
+      setScreen("quiz");
+    } catch (e) {
+      setErrorMsg(e.message || "Something went wrong. Please try again.");
+      setScreen("error");
+    }
   }
 
   function selectOption(i) {
@@ -190,7 +204,7 @@ export default function Game() {
       bar.style.transition = "none";
       bar.style.width = w;
     }
-    const item = QUESTIONS[current];
+    const item = questions[current];
     if (i === item.answer) {
       setScore((s) => s + 1);
       setFeedback({ good: true, text: `✓ Correct! +10 points to ${house}`, note: item.note });
@@ -209,7 +223,7 @@ export default function Game() {
   }
 
   function next() {
-    if (current === TOTAL - 1) { finish(); return; }
+    if (current === total - 1) { finish(); return; }
     setCurrent((c) => c + 1);
     setAnswered(false);
     setSelectedIdx(null);
@@ -218,7 +232,7 @@ export default function Game() {
 
   function finish() {
     clearInterval(timerIvl.current);
-    const pct = score / TOTAL;
+    const pct = total ? score / total : 0;
     let rank, msg, crest;
     if (pct === 1) { rank = "Order of Merlin, First Class"; crest = "🏆"; msg = "Flawless! Dumbledore himself would be impressed."; }
     else if (pct >= 0.8) { rank = "Top of the Class"; crest = "🌟"; msg = "Outstanding wizarding knowledge — Hermione would approve."; }
@@ -230,7 +244,7 @@ export default function Game() {
 
     const ts = nextTs();
     const updated = saveScore({
-      name: name.trim(), house, score, total: TOTAL,
+      name: name.trim(), house, score, total,
       difficulty: DIFFICULTY[difficulty].label, ts
     });
     setLeaderboard(updated);
@@ -260,8 +274,9 @@ export default function Game() {
     }
   }
 
-  const item = QUESTIONS[current];
+  const item = questions[current];
   const warning = timeLeft <= 5;
+  const pctScore = total ? Math.round((score / total) * 100) : 0;
 
   return (
     <>
@@ -316,7 +331,20 @@ export default function Game() {
                   onChange={(e) => setName(e.target.value)}
                   onKeyDown={(e) => { if (e.key === "Enter") begin(); }}
                 />
+
+                <label className="field-label" htmlFor="category">Choose a Category</label>
+                <select
+                  id="category"
+                  className="field-select"
+                  value={category}
+                  onChange={(e) => setCategory(e.target.value)}
+                >
+                  {CATEGORIES.map((c) => (
+                    <option key={c.name} value={c.code}>{c.name}</option>
+                  ))}
+                </select>
               </div>
+
               <div className="start-col">
                 <label className="field-label">Choose Your Difficulty</label>
                 <div className="difficulties">
@@ -344,8 +372,32 @@ export default function Game() {
           </section>
         )}
 
+        {/* ===== LOADING ===== */}
+        {screen === "loading" && (
+          <section className="card" id="loading-screen">
+            <div className="loading-wrap">
+              <div className="spinner" aria-hidden="true" />
+              <div className="loading-text">Summoning questions…</div>
+              <div className="loading-sub">Owls are fetching scrolls from the Ministry archives.</div>
+            </div>
+          </section>
+        )}
+
+        {/* ===== ERROR ===== */}
+        {screen === "error" && (
+          <section className="card" id="error-screen">
+            <div className="crest">🦉</div>
+            <h1>A hiccup in the archives</h1>
+            <p className="rank-msg" style={{ marginTop: 8 }}>{errorMsg}</p>
+            <div className="error-actions">
+              <button className="btn" onClick={begin}>Try Again ↻</button>
+              <button className="btn btn-ghost" onClick={() => setScreen("start")}>Change Selection</button>
+            </div>
+          </section>
+        )}
+
         {/* ===== QUIZ ===== */}
-        {screen === "quiz" && (
+        {screen === "quiz" && item && (
           <section className="card" id="quiz-screen" ref={cardRef}>
             <div className="hud">
               <div className="who">
@@ -359,7 +411,7 @@ export default function Game() {
             </div>
 
             <div className="progress-wrap">
-              <div className="progress-bar" style={{ width: `${(current / TOTAL) * 100}%` }} />
+              <div className="progress-bar" style={{ width: `${(current / total) * 100}%` }} />
             </div>
 
             <div className="timer-row">
@@ -370,7 +422,7 @@ export default function Game() {
               <span className={"timer-num" + (warning ? " warning" : "")}>{Math.max(0, timeLeft)}</span>
             </div>
 
-            <div className="q-count">Question {current + 1} of {TOTAL}</div>
+            <div className="q-count">Question {current + 1} of {total}</div>
             <div className="question q-anim" key={`q${current}`}>{item.q}</div>
 
             <div className="options q-anim" key={`o${current}`}>
@@ -393,7 +445,7 @@ export default function Game() {
 
             {answered && (
               <button className="btn" onClick={next}>
-                {current === TOTAL - 1 ? "See Results →" : "Next →"}
+                {current === total - 1 ? "See Results →" : "Next →"}
               </button>
             )}
           </section>
@@ -406,8 +458,11 @@ export default function Game() {
             <h1>{result?.title}</h1>
             <p className="subtitle">Your final tally from the Great Hall</p>
 
-            <div className="result-score">{score}</div>
-            <div className="result-out">out of {TOTAL} — well played, {name} of {house}</div>
+            <div className="result-score">{score}/{total}</div>
+            <div className="result-out">{pctScore}% correct — well played, {name} of {house}</div>
+            <div className="score-breakdown">
+              ✓ {score} correct · ✗ {total - score} incorrect
+            </div>
 
             <div className="rank">{result?.rank}</div>
             <p className="rank-msg">{result?.msg}</p>
